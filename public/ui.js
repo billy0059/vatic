@@ -8,36 +8,42 @@ function ui_build(job)
     var tracks = new TrackCollection(player, job);
     var objectui = new TrackObjectUI($("#newobjectbutton"), $("#objectcontainer"), videoframe, job, player, tracks);
 
+    var lanelineui = new TrackLaneLineUI($("#newlanelinebutton"), $("#objectcontainer"), videoframe, job, player, tracks); // 3/27 added
+
     ui_setupbuttons(job, player, tracks);
     ui_setupslider(player);
     ui_setupsubmit(job, tracks);
     ui_setupclickskip(job, player, tracks, objectui);
+    //ui_setupclickskip(job, player, tracks, lanelineui);
     ui_setupkeyboardshortcuts(job, player);
-    ui_loadprevious(job, objectui);
 
-    $("#newobjectbutton").click(function() {
+    ui_loadprevious(job, objectui);
+    //ui_loadprevious(job, lanelineui);
+
+
+    /*$("#newobjectbutton").click(function() {
         if (!mturk_submitallowed())
         {
             $("#turkic_acceptfirst").effect("pulsate");
         }
-    });
+    });*/
 }
 
 function ui_setup(job)
 {
     var screen = $("<div id='annotatescreen'></div>").appendTo(container);
 
-    $("<table>" + 
+    $("<table>" +
         "<tr>" +
             "<td><div id='instructionsbutton' class='button'>Instructions</div><div id='instructions'>Annotate every object, even stationary and obstructed objects, for the entire video.</td>" +
             "<td><div id='topbar'></div></td>" +
         "</tr>" +
         "<tr>" +
-              "<td><div id='videoframe'></div></td>" + 
+              "<td><div id='videoframe'></div></td>" +
               "<td rowspan='2'><div id='sidebar'></div></td>" +
-          "</tr>" + 
+          "</tr>" +
           "<tr>" +
-              "<td><div id='bottombar'></div></td>" + 
+              "<td><div id='bottombar'></div></td>" +
           "</tr>" +
           "<tr>" +
               "<td><div id='advancedoptions'></div></td>" +
@@ -64,9 +70,15 @@ function ui_setup(job)
     $("#bottombar").append("<div class='button' id='playbutton'>Play</div> ");
 
     $("#topbar").append("<div id='newobjectcontainer'>" +
-        "<div class='button' id='newobjectbutton'>New Object</div></div>");
+        "<div class='button' id='newobjectbutton'>New Object</div>" +
+        "<div class='button' id='newlanelinebutton'>New Laneline</div></div>"); // 3/27 added
+
+
 
     $("<div id='objectcontainer'></div>").appendTo("#sidebar");
+
+
+
 
     $("<div class='button' id='openadvancedoptions'>Options</div>")
         .button({
@@ -119,7 +131,7 @@ function ui_setupbuttons(job, player, tracks)
 {
     $("#instructionsbutton").click(function() {
         player.pause();
-        ui_showinstructions(job); 
+        ui_showinstructions(job);
     }).button({
         icons: {
             primary: "ui-icon-newwin"
@@ -266,7 +278,7 @@ function ui_setupkeyboardshortcuts(job, player)
 
         var keycode = e.keyCode ? e.keyCode : e.which;
         eventlog("keyboard", "Key press: " + keycode);
-        
+
         if (keycode == 32 || keycode == 112 || keycode == 116 || keycode == 98)
         {
             $("#playbutton").click();
@@ -278,12 +290,13 @@ function ui_setupkeyboardshortcuts(job, player)
         else if (keycode == 110)
         {
             $("#newobjectbutton").click();
+            $("#newlanelinebutton").click();  //3/27 added
         }
         else if (keycode == 104)
         {
             $("#annotateoptionshideboxes").click();
         }
-        else 
+        else
         {
             var skip = 0;
             if (keycode == 44 || keycode == 100)
@@ -317,7 +330,7 @@ function ui_setupkeyboardshortcuts(job, player)
 
 function ui_canresize()
 {
-    return !$("#annotateoptionsresize").attr("checked"); 
+    return !$("#annotateoptionsresize").attr("checked");
 }
 
 function ui_areboxeshidden()
@@ -348,7 +361,7 @@ function ui_setupslider(player)
 
     slider.css({
         marginTop: "6px",
-        width: parseInt(slider.parent().css("width")) - 200 + "px", 
+        width: parseInt(slider.parent().css("width")) - 200 + "px",
         float: "right"
     });
 
@@ -392,6 +405,7 @@ function ui_setupclickskip(job, player, tracks, objectui)
             console.log("Key frame hit");
             player.pause();
             $("#newobjectbutton").button("option", "disabled", false);
+            $("#newlanelinebutton").button("option", "disabled", false); //3/27 added
             $("#playbutton").button("option", "disabled", false);
             tracks.draggable(true);
             tracks.resizable(ui_canresize());
@@ -401,6 +415,7 @@ function ui_setupclickskip(job, player, tracks, objectui)
         else
         {
             $("#newobjectbutton").button("option", "disabled", true);
+            $("#newlanelinebutton").button("option", "disabled", true);  // 3/27 added
             $("#playbutton").button("option", "disabled", true);
             tracks.draggable(false);
             tracks.resizable(false);
@@ -456,7 +471,7 @@ function ui_submit(job, tracks)
 
     /*if (mturk_isassigned() && !mturk_isoffline())
     {
-        if (!window.confirm("Are you sure you are ready to submit? Please " + 
+        if (!window.confirm("Are you sure you are ready to submit? Please " +
                             "make sure that the entire video is labeled and " +
                             "your annotations are tight.\n\nTo submit, " +
                             "press OK. Otherwise, press Cancel to keep " +
@@ -497,7 +512,7 @@ function ui_submit(job, tracks)
             callback();
         });
     }
-    
+
     function savejob(callback)
     {
         server_post("savejob", [job.jobid],
@@ -560,7 +575,7 @@ function ui_submit_failedvalidation()
 
     h.append("<h1>Low Quality Work</h1>");
     h.append("<p>Sorry, but your work is low quality. We would normally <strong>reject this assignment</strong>, but we are giving you the opportunity to correct your mistakes since you are a new user.</p>");
-    
+
     h.append("<p>Please review the instructions, double check your annotations, and submit again. Remember:</p>");
 
     var str = "<ul>";
@@ -622,6 +637,7 @@ function ui_disable()
     if (ui_disabled++ == 0)
     {
         $("#newobjectbutton").button("option", "disabled", true);
+        $("#newlanelinebutton").button("option", "disabled", true); // 3/27 added
         $("#playbutton").button("option", "disabled", true);
         $("#rewindbutton").button("option", "disabled", true);
         $("#submitbutton").button("option", "disabled", true);
@@ -638,6 +654,7 @@ function ui_enable()
     if (--ui_disabled == 0)
     {
         $("#newobjectbutton").button("option", "disabled", false);
+        $("#newlanelinebutton").button("option", "disabled", false); // 3/27 added
         $("#playbutton").button("option", "disabled", false);
         $("#rewindbutton").button("option", "disabled", false);
         $("#submitbutton").button("option", "disabled", false);

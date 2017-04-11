@@ -1,6 +1,262 @@
 /*
  * Allows the user to draw a box on the screen.
  */
+ function LineDrawer(container)
+ {
+     var me = this;
+
+     this.onstartdraw = [];
+     this.onstopdraw = []
+
+     this.enabled = false;
+     this.drawing = false;
+
+     this.startx = 0;
+     this.starty = 0;
+
+     this.container = container;
+     this.handle = null;
+     this.color = null;
+
+     this.vcrosshair = null;
+     this.hcrosshair = null;
+
+     /*
+      * Enables the drawer.
+      */
+     this.enable = function()
+     {
+         this.enabled = true;
+
+         this.container.css({
+             'cursor': 'crosshair'
+         });
+
+         this.hcrosshair = $('<div></div>').appendTo(this.container);
+         this.vcrosshair = $('<div></div>').appendTo(this.container);
+
+         this.vcrosshair.css({
+             width: '2px',
+             height: '100%',
+             position: 'relative',
+             top: '0px',
+             left: '0px',
+             backgroundColor: this.color,
+             zIndex: 1
+         }).hide();
+
+         this.hcrosshair.css({
+             height: '2px',
+             width: '100%',
+             position: 'relative',
+             top: '0px',
+             left: '0px',
+             backgroundColor: this.color,
+             zIndex: 1
+         }).hide();
+     }
+
+     /*
+      * Disables the drawer. No boxes can be drawn and interface cues are
+      * disabled.
+      */
+     this.disable = function()
+     {
+         this.enabled = false;
+
+         this.container.css({
+             'cursor': 'default'
+         });
+
+         this.vcrosshair.remove();
+         this.hcrosshair.remove();
+     }
+
+     /*
+      * Method called when we receive a click on the target area.
+      */
+     this.click = function(xc, yc)
+     {
+         if (this.enabled)
+         {
+             if (!this.drawing)
+             {
+                 this.startdrawing(xc, yc);
+             }
+             else
+             {
+                 this.finishdrawing(xc, yc);
+             }
+         }
+     }
+
+     /*
+      * Updates the current visualization of the current box.
+      */
+     this.updatedrawing = function(xc, yc)
+     {
+       if (this.drawing)
+        {
+            var pos = this.calculateposition(xc, yc);
+            var offset = this.container.offset();
+            var length = Math.sqrt((this.startx-xc)*(this.startx-xc) + (this.starty-yc)*(this.starty-yc));
+            var angle  = Math.atan2(yc - this.starty, xc - this.startx) * 180 / Math.PI;
+            var transform = 'rotate('+angle+'deg)';
+            this.handle.css({
+              "transform-origin": "0 100%",
+              "height": "3px",  /* Line width of 3 */
+              "width":length,
+              //"top" : this.starty ,
+              //"left" : this.startx ,
+              "top": this.starty + offset.top + "px",
+              "left": this.startx + offset.left + "px",
+              "background": "#000", /* Black fill */
+              "position": "absolute",
+              "transform": transform
+            });
+
+        }
+      }
+
+     /*
+      * Updates the cross hairs.
+      */
+     this.updatecrosshairs = function(visible, xc, yc)
+     {
+         if (this.enabled)
+         {
+             if (visible && !this.drawing)
+             {
+                 this.vcrosshair.show().css('left', xc + 'px');
+                 this.hcrosshair.show().css('top', yc + 'px');
+             }
+             else
+             {
+                 this.vcrosshair.hide();
+                 this.hcrosshair.hide();
+             }
+         }
+     }
+
+     /*
+      * Calculates the position of the box given the starting coordinates and
+      * some new coordinates.
+      */
+     this.calculateposition = function(xc, yc)
+     {
+         var xtl = Math.min(xc, this.startx);
+         var ytl = Math.min(yc, this.starty);
+         var xbr = Math.max(xc, this.startx);
+         var ybr = Math.max(yc, this.starty);
+         return new Position(xtl, ytl, xbr, ybr)
+     }
+
+     /*
+      * Starts drawing a box.
+      */
+     this.startdrawing = function(xc, yc)
+     {
+         if (!this.drawing)
+         {
+             console.log("Starting new drawing");
+
+             this.startx = xc;
+             this.starty = yc;
+
+             this.drawing = true;
+
+             this.handle = $('<div class="boundingbox"><div>');
+             this.updatedrawing(xc, yc);
+             this.container.append(this.handle);
+
+             for (var i in this.onstartdraw)
+             {
+                 this.onstartdraw[i]();
+             }
+         }
+     }
+
+     /*
+      * Completes drawing the box. This will remove the visualization, so you will
+      * have to redraw it.
+      */
+     this.finishdrawing = function(xc, yc)
+     {
+         if (this.drawing)
+         {
+             console.log("Finishing drawing");
+
+             var position = this.calculateposition(xc, yc);
+
+             // call callbacks
+             for (var i in this.onstopdraw)
+             {
+                 this.onstopdraw[i](position);
+             }
+
+             this.drawing = false;
+             this.handle.remove();
+             this.startx = 0;
+             this.starty = 0;
+         }
+     }
+
+     /*
+      * Cancels the current drawing.
+      */
+     this.canceldrawing = function()
+     {
+         if (this.drawing)
+         {
+             console.log("Cancelling drawing");
+             this.drawing = false;
+             this.handle.remove();
+             this.startx = 0;
+             this.starty = 0;
+         }
+     }
+
+     var respondtoclick = function(e) {
+         var offset = container.offset();
+         me.click(e.pageX - offset.left, e.pageY - offset.top);
+     };
+
+     var ignoremouseup = false;
+
+     container.mousedown(function(e) {
+         ignoremouseup = true;
+         window.setTimeout(function() {
+             ignoremouseup = false;
+         }, 500);
+
+         respondtoclick(e);
+     });
+
+     container.mouseup(function(e) {
+         if (!ignoremouseup)
+         {
+             respondtoclick(e);
+         }
+     });
+
+     container.click(function(e) {
+         e.stopPropagation();
+     });
+
+     container.mousemove(function(e) {
+         var offset = container.offset();
+         var xc = e.pageX - offset.left;
+         var yc = e.pageY - offset.top;
+
+         me.updatedrawing(xc, yc);
+         me.updatecrosshairs(true, xc, yc);
+     });
+
+     $("body").click(function(e) {
+         me.canceldrawing();
+     });
+ }
+
 function BoxDrawer(container)
 {
     var me = this;
@@ -168,7 +424,7 @@ function BoxDrawer(container)
     }
 
     /*
-     * Completes drawing the box. This will remove the visualization, so you will 
+     * Completes drawing the box. This will remove the visualization, so you will
      * have to redraw it.
      */
     this.finishdrawing = function(xc, yc)
@@ -191,7 +447,7 @@ function BoxDrawer(container)
             this.starty = 0;
         }
     }
-    
+
     /*
      * Cancels the current drawing.
      */
@@ -216,7 +472,7 @@ function BoxDrawer(container)
 
     container.mousedown(function(e) {
         ignoremouseup = true;
-        window.setTimeout(function() { 
+        window.setTimeout(function() {
             ignoremouseup = false;
         }, 500);
 
@@ -261,7 +517,7 @@ function TrackCollection(player, job)
     this.job = job;
     this.tracks = [];
 
-    this.onnewobject = []; 
+    this.onnewobject = [];
 
     player.onupdate.push(function() {
         me.update(player.frame);
@@ -282,9 +538,9 @@ function TrackCollection(player, job)
     /*
      * Creates a new object.
      */
-    this.add = function(frame, position, color)
+    this.add = function(frame, position, color, type)
     {
-        var track = new Track(this.player, color, position);
+        var track = new Track(this.player, color, position, type);
         this.tracks.push(track);
 
         console.log("Added new track");
@@ -376,7 +632,7 @@ function TrackCollection(player, job)
         }
         return count;
     }
-    
+
     this.recordposition = function()
     {
         for (var i in this.tracks)
@@ -415,7 +671,7 @@ function TrackCollection(player, job)
 /*
  * A track class.
  */
-function Track(player, color, position)
+function Track(player, color, position, type)
 {
     var me = this;
 
@@ -442,7 +698,7 @@ function Track(player, color, position)
 
     this.journal.mark(this.player.job.start,
         new Position(position.xtl, position.ytl,
-                     position.xbr, position.ybr, 
+                     position.xbr, position.ybr,
                      false, true, []));
 
     this.journal.mark(this.player.frame, position);
@@ -526,7 +782,7 @@ function Track(player, color, position)
         }
 
         var xtl = Math.max(pos.xtl, 0);
-        var ytl = Math.max(pos.ytl, 0); 
+        var ytl = Math.max(pos.ytl, 0);
         var xbr = Math.min(pos.xbr, width - 1);
         var ybr = Math.min(pos.ybr, height - 1);
 
@@ -562,7 +818,7 @@ function Track(player, color, position)
     this.setocclusion = function(value)
     {
         if (value)
-        {   
+        {
             console.log("Marking object as occluded here.");
         }
         else
@@ -588,7 +844,7 @@ function Track(player, color, position)
     this.setoutside = function(value)
     {
         if (value)
-        {   
+        {
             console.log("Marking object as outside here.");
         }
         else
@@ -619,7 +875,7 @@ function Track(player, color, position)
     {
         for (var i in attributes)
         {
-            var journal = new Journal(this.player.job.start, 
+            var journal = new Journal(this.player.job.start,
                                       this.player.job.blowradius);
             journal.mark(this.player.job.start, false);
             //journal.artificialright = journal.rightmost();
@@ -692,7 +948,7 @@ function Track(player, color, position)
     }
 
     /*
-     * Draws the current box on the screen. 
+     * Draws the current box on the screen.
      */
     this.draw = function(frame, position)
     {
@@ -740,9 +996,9 @@ function Track(player, color, position)
                     me.notifystartupdate();
                     //me.triggerinteract();
                 },
-                stop: function() { 
+                stop: function() {
                     me.fixposition();
-                    me.recordposition();                
+                    me.recordposition();
                     me.notifyupdate();
                     eventlog("draggable", "Drag-n-drop a box");
                 },
@@ -786,7 +1042,7 @@ function Track(player, color, position)
         }
 
         this.handle.show();
-        
+
         if (position.occluded)
         {
             this.handle.addClass("boundingboxoccluded");
@@ -797,16 +1053,39 @@ function Track(player, color, position)
         }
 
         var offset = this.player.handle.offset();
+        var length = Math.sqrt((position.xtl-position.xbr)*(position.xtl-position.xbr) + (position.ytl-position.ybr)*(position.ytl-position.ybr));
+        var angle  = Math.atan2(-(position.ytl-position.ybr), -(position.xtl-position.xbr)) * 180 / Math.PI;
+        var transform = 'rotate('+angle+'deg)';
 
-        this.handle.css({
+        //for line
+        if (type == "line"){
+          console.log("the type is line!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+          this.handle.css({   // for line 3/28
+              "transform-origin": "0 100%",
+              "height": "3px",  ///* Line width of 3
+              "width":length,
+              //"top" : this.starty ,
+              //"left" : this.startx ,
+              "top": position.ytl + offset.top + "px",
+              "left": position.xtl + offset.left + "px",
+              "background": "#000", ///* Black fill
+              "position": "absolute",
+              "transform": transform
+              });
+        }
+        if (type == "object"){
+            console.log("the type is object!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            this.handle.css({    //   for rectangle
             top: position.ytl + offset.top + "px",
             left: position.xtl + offset.left + "px",
+
             width: (position.width - this.htmloffset) + "px",
             height: (position.height - this.htmloffset) + "px"
-        });
+            });
+      }
     }
 
-    this.triggerinteract = function() 
+    this.triggerinteract = function()
     {
         if (!this.locked && !this.drawingnew)
         {
@@ -853,7 +1132,7 @@ function Track(player, color, position)
         {
             this.handle.resizable("option", "disabled", true);
         }
-    }   
+    }
 
     this.visible = function(value)
     {
@@ -1001,7 +1280,7 @@ function Journal(start, blowradius)
     /*
      * Marks the boxes position.
      */
-    this.mark = function(frame, position) 
+    this.mark = function(frame, position)
     {
         console.log("Marking " + frame);
 
@@ -1028,7 +1307,7 @@ function Journal(start, blowradius)
         this.annotations[frame] = position;
     }
 
-    
+
     this.bounds = function(frame)
     {
         if (this.annotations[frame])
@@ -1052,7 +1331,7 @@ function Journal(start, blowradius)
 
             if (itemtime <= frame)
             {
-                if (left == null || itemtime > lefttime) 
+                if (left == null || itemtime > lefttime)
                 {
                     left = item;
                     lefttime = itemtime;;

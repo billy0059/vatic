@@ -1,7 +1,202 @@
+function TrackLaneLineUI(button, container, videoframe, job, player, tracks)   //3/27 added
+{
+    var me = this;
+    this.type == "line";
+    this.button = button;
+    this.container = container;
+    this.videoframe = videoframe;
+    this.job = job;
+    this.player = player;
+    this.tracks = tracks;
+
+    this.drawer = new LineDrawer(videoframe);    // 3/27 revised    original : this.drawer = new BoxDrawer(videoframe);
+
+    this.counter = 0;
+
+    this.currentobject = null;
+    this.currentcolor = null;
+
+    this.objects = [];
+
+    this.startnewobject = function()
+    {
+        if (this.button.button("option", "disabled"))
+        {
+            return;
+        }
+
+        tracks.drawingnew(true);
+
+        console.log("Starting new track object");
+
+        eventlog("newobject", "Start drawing new object");
+
+        //this.instructions.fadeOut();
+
+        this.currentcolor = this.pickcolor();
+        this.drawer.color = this.currentcolor[0];
+        this.drawer.enable();
+
+        this.button.button("option", "disabled", true);
+
+        this.currentobject = new TrackObject(this.job, this.player,
+                                             this.container,
+                                             this.currentcolor);
+        this.currentobject.statedraw();
+
+        this.tracks.resizable(false);
+        this.tracks.draggable(false);
+    }
+
+    this.stopdrawing = function(position)
+    {
+        console.log("Received new track object drawing");
+
+        var track = tracks.add(player.frame, position, this.currentcolor[0], this.type);
+
+        this.drawer.disable();
+        ui_disable();
+
+        this.currentobject.onready.push(function() {
+            me.stopnewobject();
+        });
+
+        this.currentobject.initialize(this.counter, track, this.tracks);
+        this.currentobject.stateclassify();
+    }
+
+    this.stopnewobject = function()
+    {
+        console.log("Finished new track object");
+
+        ui_enable();
+        tracks.drawingnew(false);
+
+        this.objects.push(this.currentobject);
+
+        this.tracks.draggable(true);
+        if ($("#annotateoptionsresize:checked").size() == 0)
+        {
+            this.tracks.resizable(true);
+        }
+        else
+        {
+            this.tracks.resizable(false);
+        }
+
+        this.tracks.dim(false);
+        this.currentobject.track.highlight(false);
+
+        this.button.button("option", "disabled", false);
+
+        this.counter++;
+    }
+
+    this.injectnewobject = function(label, path, attributes)
+    {
+        console.log("Injecting existing object");
+
+        //this.instructions.fadeOut();
+
+        this.currentcolor = this.pickcolor();
+        var obj = new TrackObject(this.job, this.player,
+                                  container, this.currentcolor);
+
+        function convert(box)
+        {
+            return new Position(box[0], box[1], box[2], box[3],
+                                box[6], box[5]);
+        }
+
+        var track = tracks.add(path[0][4], convert(path[0]),
+                               this.currentcolor[0], this.type);
+        for (var i = 1; i < path.length; i++)
+        {
+            track.journal.mark(path[i][4], convert(path[i]));
+        }
+
+        obj.initialize(this.counter, track, this.tracks);
+        obj.finalize(label);
+
+        for (var i = 0; i < attributes.length; i++)
+        {
+            track.attributejournals[attributes[i][0]].mark(attributes[i][1], attributes[i][2]);
+            console.log("Injecting attribute " + attributes[i][0] + " at frame " + attributes[i][1] + " to " + attributes[i][2]);
+        }
+
+        obj.statefolddown();
+        obj.updatecheckboxes();
+        obj.updateboxtext();
+        this.counter++;
+
+        return obj;
+    }
+
+    this.setup = function()
+    {
+        this.button.button({
+            icons: {
+                primary: "ui-icon-plusthick",
+            },
+            disabled: false
+        }).click(function() {
+            me.startnewobject();
+        });
+
+        this.drawer.onstopdraw.push(function(position) {
+            me.stopdrawing(position);
+        });
+
+        var html = "<p>In this video, please track all of these objects:</p>";
+        html += "<ul>";
+        for (var i in this.job.labels)
+        {
+            html += "<li>" + this.job.labels[i] + "</li>";
+        }
+        html += "</ul>";
+
+        this.instructions = $(html).appendTo(this.container);
+    }
+
+    this.disable = function()
+    {
+        for (var i in this.objects)
+        {
+            this.objects[i].disable();
+        }
+    }
+
+    this.enable = function()
+    {
+        for (var i in this.objects)
+        {
+            this.objects[i].enable();
+        }
+    }
+
+    this.setup();
+
+    this.availcolors = [["#FF00FF", "#FFBFFF", "#FFA6FF"],
+                        ["#FF0000", "#FFBFBF", "#FFA6A6"],
+                        ["#FF8000", "#FFDCBF", "#FFCEA6"],
+                        ["#FFD100", "#FFEEA2", "#FFEA8A"],
+                        ["#008000", "#8FBF8F", "#7CBF7C"],
+                        ["#0080FF", "#BFDFFF", "#A6D2FF"],
+                        ["#0000FF", "#BFBFFF", "#A6A6FF"],
+                        ["#000080", "#8F8FBF", "#7C7CBF"],
+                        ["#800080", "#BF8FBF", "#BF7CBF"]];
+
+    this.pickcolor = function()
+    {
+        return this.availcolors[this.availcolors.push(this.availcolors.shift()) - 1];
+    }
+}
+
+
 function TrackObjectUI(button, container, videoframe, job, player, tracks)
 {
     var me = this;
-
+    this.type = "object";
     this.button = button;
     this.container = container;
     this.videoframe = videoframe;
@@ -52,7 +247,7 @@ function TrackObjectUI(button, container, videoframe, job, player, tracks)
     {
         console.log("Received new track object drawing");
 
-        var track = tracks.add(player.frame, position, this.currentcolor[0]);
+        var track = tracks.add(player.frame, position, this.currentcolor[0], this.type);
 
         this.drawer.disable();
         ui_disable();
@@ -60,7 +255,7 @@ function TrackObjectUI(button, container, videoframe, job, player, tracks)
         this.currentobject.onready.push(function() {
             me.stopnewobject();
         });
-        
+
         this.currentobject.initialize(this.counter, track, this.tracks);
         this.currentobject.stateclassify();
     }
@@ -109,7 +304,7 @@ function TrackObjectUI(button, container, videoframe, job, player, tracks)
         }
 
         var track = tracks.add(path[0][4], convert(path[0]),
-                               this.currentcolor[0]);
+                               this.currentcolor[0], this.type);
         for (var i = 1; i < path.length; i++)
         {
             track.journal.mark(path[i][4], convert(path[i]));
@@ -278,14 +473,14 @@ function TrackObject(job, player, container, color)
     this.remove = function()
     {
         this.handle.slideUp(null, function() {
-            me.handle.remove(); 
+            me.handle.remove();
         });
         this.track.remove();
     }
 
     this.statedraw = function()
     {
-        var html = "<p>Draw a box around one of these objects:</p>"; 
+        var html = "<p>Draw a box around one of these objects:</p>";
 
         html += "<ul>";
         for (var i in this.job.labels)
@@ -305,7 +500,7 @@ function TrackObject(job, player, container, color)
     this.stateclassify = function()
     {
         this.drawinst.slideUp(null, function() {
-            me.drawinst.remove(); 
+            me.drawinst.remove();
         });
 
         var length = 0;
@@ -335,7 +530,7 @@ function TrackObject(job, player, container, color)
 
             $("input[name='classification" + this.id + "']").click(function() {
                 me.classifyinst.slideUp(null, function() {
-                    me.classifyinst.remove(); 
+                    me.classifyinst.remove();
                 });
 
                 for (var i in me.job.labels)
@@ -352,7 +547,7 @@ function TrackObject(job, player, container, color)
             });
         }
     }
-    
+
     this.finalize = function(labelid)
     {
         this.label = labelid;
@@ -425,7 +620,7 @@ function TrackObject(job, player, container, color)
 
                     me.updateboxtext();
 
-                    if (checked) 
+                    if (checked)
                     {
                         eventlog("markattribute", "Mark object as " + me.job.attributes[me.track.label][attributeid]);
                     }
@@ -505,7 +700,7 @@ function TrackObject(job, player, container, color)
         $("#trackobject" + this.id + "tooltip").click(function() {
             me.toggletooltip(false);
         }).mouseout(function() {
-            me.hidetooltip(); 
+            me.hidetooltip();
         });
     }
 
@@ -588,7 +783,7 @@ function TrackObject(job, player, container, color)
                 y = cpos.top + cheight - 215;
             }
         }
-        
+
         var numannotations = 0;
         var frames = [];
         for (var i in this.track.journal.annotations)
@@ -703,7 +898,7 @@ function TrackObject(job, player, container, color)
         if (this.tooltip != null)
         {
             this.tooltip.slideUp(250, function() {
-                $(this).remove(); 
+                $(this).remove();
             });
             this.tooltip = null;
             window.clearInterval(this.tooltiptimer);
